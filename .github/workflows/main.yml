@@ -51,8 +51,17 @@ jobs:
           fi
         done
 
-    - name: Run Maven tests
-      run: mvn test || echo "Tests failed!" > test-result.txt
+    - name: Run Maven tests for all students
+      run: |
+        for student_dir in entregas/*; do
+          if [ -d "$student_dir" ] && [ -f "$student_dir/pom.xml" ]; then
+            echo "Running tests for $student_dir"
+            cd "$student_dir"
+            mvn test || echo "Tests failed for $student_dir!" >> ../test-result.txt
+            cd ../..
+          fi
+        done
+
 
     - name: Comment if structure is incorrect
       uses: actions/github-script@v5

@@ -36,8 +36,8 @@ jobs:
           for student_dir in entregas/*; do
             if [ -d "$student_dir" ]; then
               # Check if expected directories/files are present in the student's submission
-              if [ ! -d "$student_dir/src/main/org/example/java" ]; then
-                echo "$student_dir is missing src/main/org/example/java directory!" >> structure-result.txt
+              if [ ! -d "$student_dir/src/main/java/org/example" ]; then
+                echo "$student_dir is missing src/main/java/org/example directory!" >> structure-result.txt
               fi
               if [ ! -d "$student_dir/src/test/java" ]; then
                 echo "$student_dir is missing src/test/java directory!" >> structure-result.txt

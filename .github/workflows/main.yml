@@ -24,8 +24,8 @@ jobs:
 
     - name: Check for unauthorized changes
       run: |
-        git fetch origin reto-001:reto-001
-        CHANGED_FILES=$(git diff --name-only main)
+        git fetch origin main:main
+        CHANGED_FILES=$(git diff --name-only origin/main...reto-001)
         if echo "$CHANGED_FILES" | grep -q "^\.github/workflows/"; then
           echo "Unauthorized changes detected in workflow files!"
           exit 1

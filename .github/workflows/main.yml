@@ -2,6 +2,8 @@ name: Student Code Check
 
 on:
   pull_request:
+    types:
+      - opened
     branches:
       - reto-001
 

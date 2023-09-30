@@ -57,7 +57,7 @@ jobs:
           if [ -d "$student_dir" ] && [ -f "$student_dir/pom.xml" ]; then
             echo "Running tests for $student_dir"
             cd "$student_dir"
-            mvn mvn -B package --file pom.xml || echo "Tests failed for $student_dir!" >> ../test-result.txt
+            mvn -B package --file pom.xml || echo "Tests failed for $student_dir!" >> ../test-result.txt
             cd ../..
           fi
         done

@@ -23,7 +23,7 @@
         </dependency>
     </dependencies>
     <build>
-        <testSourceDirectory>src/test/java/org/example</testSourceDirectory>
+        <testSourceDirectory>src/main/test/java/org/example</testSourceDirectory>
     </build>
 
 </project>

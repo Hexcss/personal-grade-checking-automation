@@ -24,8 +24,8 @@ jobs:
 
     - name: Check for unauthorized changes
       run: |
-        git fetch origin main:main
-        CHANGED_FILES=$(git diff --name-only origin/main...reto-001)
+        git fetch origin master:master
+        CHANGED_FILES=$(git diff --name-only origin/master...reto-001)
         if echo "$CHANGED_FILES" | grep -q "^\.github/workflows/"; then
           echo "Unauthorized changes detected in workflow files!"
           exit 1
@@ -42,8 +42,8 @@ jobs:
         for student_dir in entregas/*; do
           if [ -d "$student_dir" ]; then
             # Check if expected directories/files are present in the student's submission
-            if [ ! -d "$student_dir/src/main/java" ]; then
-              echo "$student_dir is missing src/main/java directory!" >> structure-result.txt
+            if [ ! -d "$student_dir/src/main/org/example/java" ]; then
+              echo "$student_dir is missing src/main/org/example/java directory!" >> structure-result.txt
             fi
             if [ ! -d "$student_dir/src/test/java" ]; then
               echo "$student_dir is missing src/test/java directory!" >> structure-result.txt

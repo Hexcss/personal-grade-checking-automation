@@ -46,7 +46,7 @@ jobs:
         STRUCTURE_ERRORS=""
         TEST_STATUS="Passed"
         FAILED_TESTS=""
-        
+            
         for student_dir in entregas/*; do
           if [ -d "$student_dir" ]; then
             # Check if expected directories/files are present in the student's submission
@@ -61,27 +61,32 @@ jobs:
               cd "$student_dir"
               if ! mvn test; then
                 TEST_STATUS="Failed"
-                CURRENT_FAILED_TESTS=$(xmlstarlet sel -t -v "//testcase[failure]" target/surefire-reports/*.xml)
-                FAILED_TESTS+="$student_dir: $CURRENT_FAILED_TESTS\n"
+                if [ -f target/surefire-reports/*.xml ]; then
+                  CURRENT_FAILED_TESTS=$(xmlstarlet sel -t -v "//testcase[failure]" target/surefire-reports/*.xml)
+                  FAILED_TESTS+="$student_dir: $CURRENT_FAILED_TESTS\n"
+                else
+                  FAILED_TESTS+="$student_dir: Maven test reports not found!\n"
+                fi
               fi
               cd ../..
             fi
           fi
         done
-        
+            
         {
           echo "STRUCTURE_ERRORS<<EOF"
           echo -e "$STRUCTURE_ERRORS"
           echo "EOF"
         } >> $GITHUB_OUTPUT
-        
+            
         echo "TEST_STATUS=$TEST_STATUS" >> $GITHUB_OUTPUT
-        
+            
         {
           echo "FAILED_TESTS<<EOF"
           echo -e "$FAILED_TESTS"
           echo "EOF"
         } >> $GITHUB_OUTPUT
+
 
     - name: Notify via structured JSON
       run: |

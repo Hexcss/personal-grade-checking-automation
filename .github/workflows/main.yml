@@ -60,14 +60,9 @@ jobs:
           fi
         done
 
-    - name: Echo DISCORD_WEBHOOK_URL
-      run: echo "DISCORD_WEBHOOK_URL = $DISCORD_WEBHOOK_URL"
-      env:
-        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-
     - name: Notify via structured JSON
       run: |
-        WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
+        WEBHOOK_URL="https://m66v9njz-5001.uks1.devtunnels.ms/discord-bots-3eec8/us-central1/api/logJson"
         STUDENT_NAME="${{ github.actor }}"
         REPO_URL="${{ github.event.pull_request.head.repo.html_url }}"
         AVATAR_URL="${{ github.event.pull_request.user.avatar_url }}"

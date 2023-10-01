@@ -41,19 +41,20 @@ jobs:
       run: sudo apt-get install -y xmlstarlet jq
 
     - name: Check project structure and run tests
+      id: tests
       run: |
-        STRUCTURE_ERRORS=()
+        STRUCTURE_ERRORS=""
         TEST_STATUS="Passed"
-        FAILED_TESTS=()
+        FAILED_TESTS=""
         
         for student_dir in entregas/*; do
           if [ -d "$student_dir" ]; then
             # Check if expected directories/files are present in the student's submission
             if [ ! -d "$student_dir/src/main/java/org/example" ]; then
-              STRUCTURE_ERRORS+=("$student_dir is missing src/main/java/org/example directory!")
+              STRUCTURE_ERRORS+="$student_dir is missing src/main/java/org/example directory!\n"
             fi
             if [ ! -d "$student_dir/src/test/java" ]; then
-              STRUCTURE_ERRORS+=("$student_dir is missing src/test/java directory!")
+              STRUCTURE_ERRORS+="$student_dir is missing src/test/java directory!\n"
             fi
             if [ -f "$student_dir/pom.xml" ]; then
               echo "Running tests for $student_dir"
@@ -61,17 +62,26 @@ jobs:
               if ! mvn test; then
                 TEST_STATUS="Failed"
                 CURRENT_FAILED_TESTS=$(xmlstarlet sel -t -v "//testcase[failure]" target/surefire-reports/*.xml)
-                FAILED_TESTS+=("$student_dir: $CURRENT_FAILED_TESTS")
+                FAILED_TESTS+="$student_dir: $CURRENT_FAILED_TESTS\n"
               fi
               cd ../..
             fi
           fi
         done
         
-        # Use $GITHUB_OUTPUT to set outputs
-        echo "STRUCTURE_ERRORS=$STRUCTURE_ERRORS" >> $GITHUB_OUTPUT
+        {
+          echo "STRUCTURE_ERRORS<<EOF"
+          echo -e "$STRUCTURE_ERRORS"
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+        
         echo "TEST_STATUS=$TEST_STATUS" >> $GITHUB_OUTPUT
-        echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_OUTPUT
+        
+        {
+          echo "FAILED_TESTS<<EOF"
+          echo -e "$FAILED_TESTS"
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
 
     - name: Notify via structured JSON
       run: |
@@ -92,8 +102,8 @@ jobs:
                         --arg avatarURL "$AVATAR_URL" \
                         --arg structureCheck "$STRUCTURE_STATUS" \
                         --arg testStatus "$TEST_STATUS" \
-                        --argjson structureErrors "$(echo "$STRUCTURE_ERRORS" | jq -R . | jq -s .)" \
-                        --argjson failedTests "$(echo "$FAILED_TESTS" | jq -R . | jq -s .)" \
+                        --argjson structureErrors "$(echo -e "$STRUCTURE_ERRORS" | jq -R . | jq -s .)" \
+                        --argjson failedTests "$(echo -e "$FAILED_TESTS" | jq -R . | jq -s .)" \
                         '{
                           student: $student,
                           repoURL: $repoURL,

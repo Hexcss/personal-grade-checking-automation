@@ -31,41 +31,76 @@ jobs:
           exit 1
         fi
 
-    - name: Check project structure
-      run: |
-          for student_dir in entregas/*; do
-            if [ -d "$student_dir" ]; then
-              # Check if expected directories/files are present in the student's submission
-              if [ ! -d "$student_dir/src/main/java/org/example" ]; then
-                echo "$student_dir is missing src/main/java/org/example directory!" >> structure-result.txt
-              fi
-              if [ ! -d "$student_dir/src/test/java" ]; then
-                echo "$student_dir is missing src/test/java directory!" >> structure-result.txt
-              fi
-            fi
-          done
-          if [ -f "structure-result.txt" ]; then
-            cat structure-result.txt
-            exit 1
-          fi
-
     - name: Set up JDK 20
       uses: actions/setup-java@v2
       with:
         java-version: '20'
         distribution: 'temurin'
 
-    - name: Run Maven tests for all students
+    - name: Install xmlstarlet and jq
+      run: sudo apt-get install -y xmlstarlet jq
+
+    - name: Check project structure and run tests
       run: |
         for student_dir in entregas/*; do
-          if [ -d "$student_dir" ] && [ -f "$student_dir/pom.xml" ]; then
-            echo "Running tests for $student_dir"
-            cd "$student_dir"
-            mvn test || { echo "Tests failed for $student_dir!"; echo "Tests failed for $student_dir!" >> ../test-result.txt; exit 1; }
-            cd ../..
+          if [ -d "$student_dir" ]; then
+            # Check if expected directories/files are present in the student's submission
+            if [ ! -d "$student_dir/src/main/java/org/example" ]; then
+              echo "$student_dir is missing src/main/java/org/example directory!" >> structure-result.txt
+            fi
+            if [ ! -d "$student_dir/src/test/java" ]; then
+              echo "$student_dir is missing src/test/java directory!" >> structure-result.txt
+            fi
+            if [ -f "$student_dir/pom.xml" ]; then
+              echo "Running tests for $student_dir"
+              cd "$student_dir"
+              mvn test || echo "Tests failed for $student_dir!" >> ../test-result.txt
+              cd ../..
+            fi
           fi
         done
 
+    - name: Notify via structured JSON
+      run: |
+        WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
+        STUDENT_NAME="${{ github.actor }}"
+        REPO_URL="${{ github.event.pull_request.head.repo.html_url }}"
+        AVATAR_URL="${{ github.event.pull_request.user.avatar_url }}"
+        
+        STRUCTURE_STATUS="Passed"
+        STRUCTURE_ERRORS=()
+        if [ -f "structure-result.txt" ]; then
+          STRUCTURE_STATUS="Failed"
+          while IFS= read -r line; do
+            STRUCTURE_ERRORS+=("$line")
+          done < structure-result.txt
+        fi
+        TEST_STATUS="Passed"
+        FAILED_TESTS=()
+        if [ -f "test-result.txt" ]; then
+          TEST_STATUS="Failed"
+          while IFS= read -r line; do
+            FAILED_TESTS+=("$line")
+          done < <(xmlstarlet sel -t -v "//testcase[failure]" entregas/${STUDENT_NAME}/target/surefire-reports/*.xml)
+        fi
+        JSON_CONTENT=$(jq -n \
+                        --arg student "$STUDENT_NAME" \
+                        --arg repoURL "$REPO_URL" \
+                        --arg avatarURL "$AVATAR_URL" \
+                        --arg structureCheck "$STRUCTURE_STATUS" \
+                        --arg testStatus "$TEST_STATUS" \
+                        --argjson structureErrors "$(echo "${STRUCTURE_ERRORS[@]}" | jq -R . | jq -s .)" \
+                        --argjson failedTests "$(echo "${FAILED_TESTS[@]}" | jq -R . | jq -s .)" \
+                        '{
+                          student: $student,
+                          repoURL: $repoURL,
+                          avatarURL: $avatarURL,
+                          structureCheck: $structureCheck,
+                          structureErrors: $structureErrors,
+                          testStatus: $testStatus,
+                          failedTests: $failedTests
+                        }')
+        curl -H "Content-Type: application/json" -X POST -d "$JSON_CONTENT" $WEBHOOK_URL
 
     - name: Comment if structure is incorrect
       uses: actions/github-script@v5

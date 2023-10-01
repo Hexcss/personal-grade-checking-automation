@@ -101,9 +101,9 @@ jobs:
                         --arg repoURL "$REPO_URL" \
                         --arg avatarURL "$AVATAR_URL" \
                         --arg structureCheck "$STRUCTURE_STATUS" \
-                        --arg testStatus "$TEST_STATUS" \
-                        --argjson structureErrors "$(echo -e "$STRUCTURE_ERRORS" | jq -R . | jq -s .)" \
-                        --argjson failedTests "$(echo -e "$FAILED_TESTS" | jq -R . | jq -s .)" \
+                        --arg testStatus "${{ needs.tests.outputs.TEST_STATUS }}" \
+                        --argjson structureErrors "$(echo "${{ needs.tests.outputs.STRUCTURE_ERRORS }}" | jq -R . | jq -s .)" \
+                        --argjson failedTests "$(echo "${{ needs.tests.outputs.FAILED_TESTS }}" | jq -R . | jq -s .)" \
                         '{
                           student: $student,
                           repoURL: $repoURL,

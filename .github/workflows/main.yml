@@ -42,23 +42,35 @@ jobs:
 
     - name: Check project structure and run tests
       run: |
+        STRUCTURE_ERRORS=()
+        TEST_STATUS="Passed"
+        FAILED_TESTS=()
+        
         for student_dir in entregas/*; do
           if [ -d "$student_dir" ]; then
             # Check if expected directories/files are present in the student's submission
             if [ ! -d "$student_dir/src/main/java/org/example" ]; then
-              echo "$student_dir is missing src/main/java/org/example directory!" >> structure-result.txt
+              STRUCTURE_ERRORS+=("$student_dir is missing src/main/java/org/example directory!")
             fi
             if [ ! -d "$student_dir/src/test/java" ]; then
-              echo "$student_dir is missing src/test/java directory!" >> structure-result.txt
+              STRUCTURE_ERRORS+=("$student_dir is missing src/test/java directory!")
             fi
             if [ -f "$student_dir/pom.xml" ]; then
               echo "Running tests for $student_dir"
               cd "$student_dir"
-              mvn test || echo "Tests failed for $student_dir!" >> ../test-result.txt
+              if ! mvn test; then
+                TEST_STATUS="Failed"
+                CURRENT_FAILED_TESTS=$(xmlstarlet sel -t -v "//testcase[failure]" target/surefire-reports/*.xml)
+                FAILED_TESTS+=("$student_dir: $CURRENT_FAILED_TESTS")
+              fi
               cd ../..
             fi
           fi
         done
+        
+        echo "STRUCTURE_ERRORS=${STRUCTURE_ERRORS[@]}" >> $GITHUB_ENV
+        echo "TEST_STATUS=$TEST_STATUS" >> $GITHUB_ENV
+        echo "FAILED_TESTS=${FAILED_TESTS[@]}" >> $GITHUB_ENV
 
     - name: Notify via structured JSON
       run: |
@@ -68,21 +80,10 @@ jobs:
         AVATAR_URL="${{ github.event.pull_request.user.avatar_url }}"
         
         STRUCTURE_STATUS="Passed"
-        STRUCTURE_ERRORS=()
-        if [ -f "structure-result.txt" ]; then
+        if [[ ${#STRUCTURE_ERRORS[@]} -ne 0 ]]; then
           STRUCTURE_STATUS="Failed"
-          while IFS= read -r line; do
-            STRUCTURE_ERRORS+=("$line")
-          done < structure-result.txt
         fi
-        TEST_STATUS="Passed"
-        FAILED_TESTS=()
-        if [ -f "test-result.txt" ]; then
-          TEST_STATUS="Failed"
-          while IFS= read -r line; do
-            FAILED_TESTS+=("$line")
-          done < <(xmlstarlet sel -t -v "//testcase[failure]" entregas/${STUDENT_NAME}/target/surefire-reports/*.xml)
-        fi
+        
         JSON_CONTENT=$(jq -n \
                         --arg student "$STUDENT_NAME" \
                         --arg repoURL "$REPO_URL" \
@@ -102,30 +103,27 @@ jobs:
                         }')
         curl -H "Content-Type: application/json" -X POST -d "$JSON_CONTENT" $WEBHOOK_URL
 
+
     - name: Comment if structure is incorrect
+      if: env.STRUCTURE_ERRORS != ''
       uses: actions/github-script@v5
-      if: steps.build.outputs.structure-result == 'failure'
       with:
         script: |
-          const fs = require('fs');
-          const structureResult = fs.readFileSync('structure-result.txt', 'utf8');
           github.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: structureResult
+            body: env.STRUCTURE_ERRORS
           });
 
     - name: Comment if tests failed
+      if: env.TEST_STATUS == 'Failed'
       uses: actions/github-script@v5
-      if: steps.build.outputs.test-result == 'failure'
       with:
         script: |
-          const fs = require('fs');
-          const testResult = fs.readFileSync('test-result.txt', 'utf8');
           github.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: testResult
+            body: env.FAILED_TESTS
           });

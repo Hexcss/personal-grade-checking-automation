@@ -68,9 +68,9 @@ jobs:
           fi
         done
         
-        echo "STRUCTURE_ERRORS=${STRUCTURE_ERRORS[@]}" >> $GITHUB_ENV
+        echo "STRUCTURE_ERRORS=${STRUCTURE_ERRORS[*]}" >> $GITHUB_ENV
         echo "TEST_STATUS=$TEST_STATUS" >> $GITHUB_ENV
-        echo "FAILED_TESTS=${FAILED_TESTS[@]}" >> $GITHUB_ENV
+        echo "FAILED_TESTS=${FAILED_TESTS[*]}" >> $GITHUB_ENV
 
     - name: Notify via structured JSON
       run: |
@@ -80,7 +80,7 @@ jobs:
         AVATAR_URL="${{ github.event.pull_request.user.avatar_url }}"
         
         STRUCTURE_STATUS="Passed"
-        if [[ ${#STRUCTURE_ERRORS[@]} -ne 0 ]]; then
+        if [[ -n $STRUCTURE_ERRORS ]]; then
           STRUCTURE_STATUS="Failed"
         fi
         
@@ -90,8 +90,8 @@ jobs:
                         --arg avatarURL "$AVATAR_URL" \
                         --arg structureCheck "$STRUCTURE_STATUS" \
                         --arg testStatus "$TEST_STATUS" \
-                        --argjson structureErrors "$(echo "${STRUCTURE_ERRORS[@]}" | jq -R . | jq -s .)" \
-                        --argjson failedTests "$(echo "${FAILED_TESTS[@]}" | jq -R . | jq -s .)" \
+                        --argjson structureErrors "$(echo "$STRUCTURE_ERRORS" | jq -R . | jq -s .)" \
+                        --argjson failedTests "$(echo "$FAILED_TESTS" | jq -R . | jq -s .)" \
                         '{
                           student: $student,
                           repoURL: $repoURL,

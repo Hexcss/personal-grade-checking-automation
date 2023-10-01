@@ -68,9 +68,10 @@ jobs:
           fi
         done
         
-        echo "::set-output name=STRUCTURE_ERRORS::${STRUCTURE_ERRORS[*]}"
-        echo "::set-output name=TEST_STATUS::$TEST_STATUS"
-        echo "::set-output name=FAILED_TESTS::${FAILED_TESTS[*]}"
+        # Use $GITHUB_OUTPUT to set outputs
+        echo "STRUCTURE_ERRORS=$STRUCTURE_ERRORS" >> $GITHUB_OUTPUT
+        echo "TEST_STATUS=$TEST_STATUS" >> $GITHUB_OUTPUT
+        echo "FAILED_TESTS=$FAILED_TESTS" >> $GITHUB_OUTPUT
 
     - name: Notify via structured JSON
       run: |
@@ -79,11 +80,7 @@ jobs:
         REPO_URL="${{ github.event.pull_request.head.repo.html_url }}"
         AVATAR_URL="${{ github.event.pull_request.user.avatar_url }}"
         
-        # Capture the output variables from the previous step
-        STRUCTURE_ERRORS="${{ steps.tests.outputs.STRUCTURE_ERRORS }}"
-        TEST_STATUS="${{ steps.tests.outputs.TEST_STATUS }}"
-        FAILED_TESTS="${{ steps.tests.outputs.FAILED_TESTS }}"
-        
+        # Directly use the environment variables
         STRUCTURE_STATUS="Passed"
         if [[ -n $STRUCTURE_ERRORS ]]; then
           STRUCTURE_STATUS="Failed"
@@ -107,7 +104,6 @@ jobs:
                           failedTests: $failedTests
                         }')
         curl -H "Content-Type: application/json" -X POST -d "$JSON_CONTENT" $WEBHOOK_URL
-
 
     - name: Comment if structure is incorrect
       if: env.STRUCTURE_ERRORS != ''

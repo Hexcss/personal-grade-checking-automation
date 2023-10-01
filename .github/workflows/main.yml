@@ -60,6 +60,11 @@ jobs:
           fi
         done
 
+    - name: Echo DISCORD_WEBHOOK_URL
+      run: echo "DISCORD_WEBHOOK_URL = $DISCORD_WEBHOOK_URL"
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
     - name: Notify via structured JSON
       run: |
         WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"

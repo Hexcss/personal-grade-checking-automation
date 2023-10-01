@@ -8,8 +8,13 @@ on:
       - reto-001
 
 jobs:
-  build:
+  testing:
     runs-on: ubuntu-latest
+    
+    outputs:
+      structure_errors: ${{ steps.tests.outputs.STRUCTURE_ERRORS }}
+      test_status: ${{ steps.tests.outputs.TEST_STATUS }}
+      failed_tests: ${{ steps.tests.outputs.FAILED_TESTS }}
 
     steps:
     - name: Checkout code
@@ -87,7 +92,11 @@ jobs:
           echo "EOF"
         } >> $GITHUB_OUTPUT
 
+  notify:
+    needs: testing
+    runs-on: ubuntu-latest
 
+    steps:
     - name: Notify via structured JSON
       run: |
         WEBHOOK_URL="https://m66v9njz-5001.uks1.devtunnels.ms/discord-bots-3eec8/us-central1/api/logJson"
@@ -95,9 +104,8 @@ jobs:
         REPO_URL="${{ github.event.pull_request.head.repo.html_url }}"
         AVATAR_URL="${{ github.event.pull_request.user.avatar_url }}"
         
-        # Directly use the environment variables
         STRUCTURE_STATUS="Passed"
-        if [[ -n $STRUCTURE_ERRORS ]]; then
+        if [[ -n ${{ needs.testing.outputs.structure_errors }} ]]; then
           STRUCTURE_STATUS="Failed"
         fi
         
@@ -106,9 +114,9 @@ jobs:
                         --arg repoURL "$REPO_URL" \
                         --arg avatarURL "$AVATAR_URL" \
                         --arg structureCheck "$STRUCTURE_STATUS" \
-                        --arg testStatus "${{ needs.tests.outputs.TEST_STATUS }}" \
-                        --argjson structureErrors "$(echo "${{ needs.tests.outputs.STRUCTURE_ERRORS }}" | jq -R . | jq -s .)" \
-                        --argjson failedTests "$(echo "${{ needs.tests.outputs.FAILED_TESTS }}" | jq -R . | jq -s .)" \
+                        --arg testStatus "${{ needs.testing.outputs.test_status }}" \
+                        --argjson structureErrors "$(echo "${{ needs.testing.outputs.structure_errors }}" | jq -R . | jq -s .)" \
+                        --argjson failedTests "$(echo "${{ needs.testing.outputs.failed_tests }}" | jq -R . | jq -s .)" \
                         '{
                           student: $student,
                           repoURL: $repoURL,
@@ -119,27 +127,3 @@ jobs:
                           failedTests: $failedTests
                         }')
         curl -H "Content-Type: application/json" -X POST -d "$JSON_CONTENT" $WEBHOOK_URL
-
-    - name: Comment if structure is incorrect
-      if: env.STRUCTURE_ERRORS != ''
-      uses: actions/github-script@v5
-      with:
-        script: |
-          github.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: env.STRUCTURE_ERRORS
-          });
-
-    - name: Comment if tests failed
-      if: env.TEST_STATUS == 'Failed'
-      uses: actions/github-script@v5
-      with:
-        script: |
-          github.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: env.FAILED_TESTS
-          });

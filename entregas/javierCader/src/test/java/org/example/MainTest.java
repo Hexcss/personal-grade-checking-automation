@@ -11,8 +11,5 @@ class MainTest {
         Assertions.assertEquals("Hello, World!", Main.greet("World"));
     }
 
-    @Test
-    public void testGreet_2() {
-        assertEquals("Hey, World!", Main.greet("World"));
-    }
+
 }

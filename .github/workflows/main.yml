@@ -93,16 +93,9 @@ jobs:
       IDE_SPECIFIC_FILES: ${{ needs.check-structure.outputs.ide-specific-files }}
       FOLDER_STRUCTURE: ${{ needs.check-structure.outputs.folder-structure }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
-    permissions:
-      issues: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-  
-      - name: Install GitHub CLI
-        run: |
-          sudo apt update
-          sudo apt install -y gh
   
       - name: Create an issue in the repository if there are errors
         if: >-
@@ -118,7 +111,11 @@ jobs:
           if [ ${#errorMessages[@]} -gt 0 ]; then
             issueTitle="Error in PR #$PR_NUMBER"
             issueBody="The following errors were found in PR #$PR_NUMBER:\n${errorMessages[*]}"
-            echo "$issueBody" | gh issue create -t "$issueTitle" -b -
+      
+            curl -X POST ${{ secrets.API_ENDPOINT }} \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
+              -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"<owner-name>\", \"repo\":\"<repo-name>\"}"
           fi
 
         

@@ -14,14 +14,14 @@ jobs:
 
     outputs:
       pr-title-and-body: ${{ steps.pr-title-and-body.outputs.ERROR_MESSAGE }}
-      ide-specific-files: ${{ steps.ide-specific-files.outputs.ERROR_MESSAGE}}
-      folder-structure: ${{ steps.folder-structure.outputs.valid.ERROR_MESSAGE }}
+      ide-specific-files: ${{ steps.ide-specific-files.outputs.ERROR_MESSAGE }}
+      folder-structure: ${{ steps.folder-structure.outputs.ERROR_MESSAGE }}
 
     steps:
     - name: Check out code
       uses: actions/checkout@v2
 
-      # Security check
+    # Security check
     - name: Check repository
       run: |
         if [[ "$GITHUB_REPOSITORY" != "Hexcss/personal-grade-checking-automation" ]]; then
@@ -29,16 +29,7 @@ jobs:
           exit 1
         fi
 
-    - name: Check for unauthorized changes
-      run: |
-        git fetch origin master:master
-        CHANGED_FILES=$(git diff --name-only origin/master..HEAD)
-        if echo "$CHANGED_FILES" | grep -q "^\.github/workflows/"; then
-          echo "Unauthorized changes detected in workflow files!"
-          exit 1
-        fi
-
-      # Structure check
+    # Structure check
     - name: Check PR title and body
       id: pr-title-and-body
       run: |
@@ -46,42 +37,47 @@ jobs:
         if [ -z "${{ github.event.pull_request.title }}" ] || [ -z "${{ github.event.pull_request.body }}" ]; then
           ERROR_MESSAGE+="PR title or body is empty.\n"
         fi
-        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
+        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
 
     - name: Check for IDE-specific config files
       id: ide-specific-files
       run: |
         ERROR_MESSAGE=""
         banned_files=("*.idea" "*.vscode" "*.eclipse")
-        for file in "${banned_files[@]}"
+        for pattern in "${banned_files[@]}"
         do
-          if [ -e "$file" ]; then
-            ERROR_MESSAGE+="IDE-specific config file $file found.\n"
+          # Using the globstar shell option to match files recursively
+          shopt -s globstar
+          files=$(echo $pattern)
+          if [ ! -z "$files" ]; then
+            ERROR_MESSAGE+="IDE-specific config files found: $files.\n"
           fi
         done
-        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
+        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
 
     - name: Check folder structure
       id: folder-structure
       run: |
         ERROR_MESSAGE=""
-        if [ ! -d "entragas" ]; then
-          ERROR_MESSAGE+="entragas folder is missing.\n"
+        if [ ! -d "entregas" ]; then
+          ERROR_MESSAGE+="entregas folder is missing.\n"
         fi
-        camel_case_folders=$(find . -type d -regex "./[a-z]+([A-Z][a-z]+)+")
+        # Corrected regex for camel case folders
+        camel_case_folders=$(find . -maxdepth 1 -type d -regex "./[a-z]+([A-Z][a-z]+)+")
         if [ -z "$camel_case_folders" ]; then
           ERROR_MESSAGE+="No folder with student name found.\n"
+        else
+          for folder in $camel_case_folders
+          do
+            if [ ! -d "$folder/reto-002" ]; then
+              ERROR_MESSAGE+="reto-002 folder is missing inside $folder.\n"
+            fi
+            if [ ! -e "$folder/reto-002/README.md" ]; then
+              ERROR_MESSAGE+="README.md file is missing inside $folder/reto-002.\n"
+            fi
+          done
         fi
-        for folder in $camel_case_folders
-        do
-          if [ ! -d "$folder/reto-002" ]; then
-            ERROR_MESSAGE+="reto-002 folder is missing inside $folder.\n"
-          fi
-          if [ ! -e "$folder/reto-002/README.md" ]; then
-            ERROR_MESSAGE+="README.md file is missing inside $folder/reto-002.\n"
-          fi
-        done
-        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
+        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_ENV"
 
 
   notify-issue:

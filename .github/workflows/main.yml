@@ -112,7 +112,7 @@ jobs:
             issueTitle="Error in PR #$PR_NUMBER"
             issueBody="The following errors were found in PR #$PR_NUMBER:\n${errorMessages[*]}"
       
-            curl -X POST ${{ secrets.API_ENDPOINT }} \
+            curl -X POST "https://shfs5frz-9000.use.devtunnels.ms/create-issue"\
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
               -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"<owner-name>\", \"repo\":\"<repo-name>\"}"

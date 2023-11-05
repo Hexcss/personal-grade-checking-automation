@@ -77,7 +77,7 @@ jobs:
             fi
           done
         fi
-        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_ENV"
+        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
 
 
   notify-issue:

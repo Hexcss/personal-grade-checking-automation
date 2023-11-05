@@ -65,7 +65,6 @@ jobs:
           else
             cd entregas
             camel_case_folders=$(find . -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex "./[a-z]+([A-Z][a-z]+)+")
-            cd ..
             if [ -z "$camel_case_folders" ]; then
               ERROR_MESSAGE+="No folder with student name found in entregas.\n"
             else

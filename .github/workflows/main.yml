@@ -93,6 +93,8 @@ jobs:
       IDE_SPECIFIC_FILES: ${{ needs.check-structure.outputs.ide-specific-files }}
       FOLDER_STRUCTURE: ${{ needs.check-structure.outputs.folder-structure }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
+    permissions:
+      issues: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -109,15 +111,14 @@ jobs:
           env.FOLDER_STRUCTURE != ''
         run: |
           errorMessages=()
-            [[ -n "$PR_TITLE_AND_BODY" ]] && errorMessages+=("PR Title and Body: $PR_TITLE_AND_BODY")
-            [[ -n "$IDE_SPECIFIC_FILES" ]] && errorMessages+=("IDE-specific files: $IDE_SPECIFIC_FILES")
-            [[ -n "$FOLDER_STRUCTURE" ]] && errorMessages+=("Folder Structure: $FOLDER_STRUCTURE")
-            
-            if [ ${#errorMessages[@]} -gt 0 ]; then
-              issueTitle="Error in PR #$PR_NUMBER"
-              issueBody="The following errors were found in PR #$PR_NUMBER:\n${errorMessages[*]}"
-              echo -e "$issueBody" | gh auth setup-git -t ${{ env.GITHUB_TOKEN }}
-              echo -e "$issueBody" | gh issue create --title "$issueTitle" --body -
-            fi
+          [[ -n "$PR_TITLE_AND_BODY" ]] && errorMessages+=("PR Title and Body: $PR_TITLE_AND_BODY")
+          [[ -n "$IDE_SPECIFIC_FILES" ]] && errorMessages+=("IDE-specific files: $IDE_SPECIFIC_FILES")
+          [[ -n "$FOLDER_STRUCTURE" ]] && errorMessages+=("Folder Structure: $FOLDER_STRUCTURE")
+          
+          if [ ${#errorMessages[@]} -gt 0 ]; then
+            issueTitle="Error in PR #$PR_NUMBER"
+            issueBody="The following errors were found in PR #$PR_NUMBER:\n${errorMessages[*]}"
+            echo "$issueBody" | gh issue create -t "$issueTitle" -b -
+          fi
 
         

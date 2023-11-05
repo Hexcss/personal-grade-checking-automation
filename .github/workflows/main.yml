@@ -1,25 +1,27 @@
-name: Student Code Check
+name: Check PR Structure
 
 on:
   pull_request:
+    branches:
+      - reto-002
     types:
       - opened
-    branches:
-      - reto-001
+      - synchronize
 
 jobs:
-  testing:
+  check-structure:
     runs-on: ubuntu-latest
-    
+
     outputs:
-      structure_errors: ${{ steps.tests.outputs.STRUCTURE_ERRORS }}
-      test_status: ${{ steps.tests.outputs.TEST_STATUS }}
-      failed_tests: ${{ steps.tests.outputs.FAILED_TESTS }}
+      pr-title-and-body: ${{ steps.pr-title-and-body.outputs.ERROR_MESSAGE }}
+      ide-specific-files: ${{ steps.ide-specific-files.outputs.ERROR_MESSAGE}}
+      folder-structure: ${{ steps.folder-structure.outputs.valid.ERROR_MESSAGE }}
 
     steps:
-    - name: Checkout code
+    - name: Check out code
       uses: actions/checkout@v2
 
+      # Security check
     - name: Check repository
       run: |
         if [[ "$GITHUB_REPOSITORY" != "Hexcss/grade-checking-automation" ]]; then
@@ -36,96 +38,87 @@ jobs:
           exit 1
         fi
 
-    - name: Set up JDK 20
-      uses: actions/setup-java@v2
-      with:
-        java-version: '20'
-        distribution: 'temurin'
-
-    - name: Install xmlstarlet and jq
-      run: sudo apt-get install -y xmlstarlet jq
-
-    - name: Check project structure and run tests
-      id: tests
+      # Structure check
+    - name: Check PR title and body
+      id: pr-title-and-body
       run: |
-        STRUCTURE_ERRORS=""
-        TEST_STATUS="Passed"
-        FAILED_TESTS=""
-            
-        for student_dir in entregas/*; do
-          if [ -d "$student_dir" ]; then
-            # Check if expected directories/files are present in the student's submission
-            if [ ! -d "$student_dir/src/main/java/org/example" ]; then
-              STRUCTURE_ERRORS+="$student_dir is missing src/main/java/org/example directory!\n"
-            fi
-            if [ ! -d "$student_dir/src/test/java" ]; then
-              STRUCTURE_ERRORS+="$student_dir is missing src/test/java directory!\n"
-            fi
-            if [ -f "$student_dir/pom.xml" ]; then
-              echo "Running tests for $student_dir"
-              cd "$student_dir"
-              if ! mvn test; then
-                TEST_STATUS="Failed"
-                if [ -f target/surefire-reports/*.xml ]; then
-                  CURRENT_FAILED_TESTS=$(xmlstarlet sel -t -v "//testcase[failure]" target/surefire-reports/*.xml)
-                  FAILED_TESTS+="$student_dir: $CURRENT_FAILED_TESTS\n"
-                else
-                  FAILED_TESTS+="$student_dir: Maven test reports not found!\n"
-                fi
-              fi
-              cd ../..
-            fi
+        ERROR_MESSAGE=""
+        if [ -z "${{ github.event.pull_request.title }}" ] || [ -z "${{ github.event.pull_request.body }}" ]; then
+          ERROR_MESSAGE+="PR title or body is empty.\n"
+        fi
+        echo "error_message=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
+
+    - name: Check for IDE-specific config files
+      id: ide-specific-files
+      run: |
+        ERROR_MESSAGE=""
+        banned_files=("*.idea" "*.vscode" "*.eclipse")
+        for file in "${banned_files[@]}"
+        do
+          if [ -e "$file" ]; then
+            ERROR_MESSAGE+="IDE-specific config file $file found.\n"
           fi
         done
-            
-        {
-          echo "STRUCTURE_ERRORS<<EOF"
-          echo -e "$STRUCTURE_ERRORS"
-          echo "EOF"
-        } >> $GITHUB_OUTPUT
-            
-        echo "TEST_STATUS=$TEST_STATUS" >> $GITHUB_OUTPUT
-            
-        {
-          echo "FAILED_TESTS<<EOF"
-          echo -e "$FAILED_TESTS"
-          echo "EOF"
-        } >> $GITHUB_OUTPUT
+        echo "error_message=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
 
-  notify:
-    needs: testing
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Notify via structured JSON
-      env: 
-        STRUCTURE_ERRORS: ${{ needs.testing.outputs.structure_errors }}
+    - name: Check folder structure
+      id: folder-structure
       run: |
-        WEBHOOK_URL="https://us-central1-discord-bots-3eec8.cloudfunctions.net/api/logJson"
-        STUDENT_NAME="${{ github.actor }}"
-        REPO_URL="${{ github.event.pull_request.head.repo.html_url }}"
-        AVATAR_URL="${{ github.event.pull_request.user.avatar_url }}"
-        
-        STRUCTURE_STATUS="Passed"
-        if [[ -n "$STRUCTURE_ERRORS" ]]; then
-          STRUCTURE_STATUS="Failed"
+        ERROR_MESSAGE=""
+        if [ ! -d "entragas" ]; then
+          ERROR_MESSAGE+="entragas folder is missing.\n"
         fi
+        camel_case_folders=$(find . -type d -regex "./[a-z]+([A-Z][a-z]+)+")
+        if [ -z "$camel_case_folders" ]; then
+          ERROR_MESSAGE+="No folder with student name found.\n"
+        fi
+        for folder in $camel_case_folders
+        do
+          if [ ! -d "$folder/reto-002" ]; then
+            ERROR_MESSAGE+="reto-002 folder is missing inside $folder.\n"
+          fi
+          if [ ! -e "$folder/reto-002/README.md" ]; then
+            ERROR_MESSAGE+="README.md file is missing inside $folder/reto-002.\n"
+          fi
+        done
+        echo "error_message=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
+
+
+  notify-issue:
+    needs: check-structure
+    runs-on: ubuntu-latest
+    if: >-
+      always() &&
+      (
+        needs.check-structure.outputs.pr-title-and-body != '' ||
+        needs.check-structure.outputs.ide-specific-files != '' ||
+        needs.check-structure.outputs.folder-structure != ''
+      )
+    steps:
+      - name: Create an issue in the repository if there are errors
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const errorMessages = [
+              needs.check-structure.outputs.pr-title-and-body ? `PR Title and Body: ${process.env.PR_TITLE_AND_BODY}` : '',
+              needs.check-structure.outputs.ide-specific-files ? `IDE-specific files: ${process.env.IDE_SPECIFIC_FILES}` : '',
+              needs.check-structure.outputs.folder-structure ? `Folder Structure: ${process.env.FOLDER_STRUCTURE}` : ''
+            ].filter(Boolean).join('\n');
+            
+            if (errorMessages.length > 0) {
+              const issueTitle = `Error in PR #${{ github.event.pull_request.number }}`;
+              const issueBody = `The following errors were found in PR #${{ github.event.pull_request.number }}:\n${errorMessages}`;
+              await github.issues.create({
+                owner: owner,
+                repo: repo,
+                title: issueTitle,
+                body: issueBody
+              });
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE_AND_BODY: ${{ needs.check-structure.outputs.pr-title-and-body }}
+          IDE_SPECIFIC_FILES: ${{ needs.check-structure.outputs.ide-specific-files }}
+          FOLDER_STRUCTURE: ${{ needs.check-structure.outputs.folder-structure }}
         
-        JSON_CONTENT=$(jq -n \
-                        --arg student "$STUDENT_NAME" \
-                        --arg repoURL "$REPO_URL" \
-                        --arg avatarURL "$AVATAR_URL" \
-                        --arg structureCheck "$STRUCTURE_STATUS" \
-                        --arg testStatus "${{ needs.testing.outputs.test_status }}" \
-                        --argjson structureErrors "$(echo "${{ needs.testing.outputs.structure_errors }}" | jq -R . | jq -s .)" \
-                        --argjson failedTests "$(echo "${{ needs.testing.outputs.failed_tests }}" | jq -R . | jq -s .)" \
-                        '{
-                          student: $student,
-                          repoURL: $repoURL,
-                          avatarURL: $avatarURL,
-                          structureCheck: $structureCheck,
-                          structureErrors: $structureErrors,
-                          testStatus: $testStatus,
-                          failedTests: $failedTests
-                        }')
-        curl -H "Content-Type: application/json" -X POST -d "$JSON_CONTENT" $WEBHOOK_URL

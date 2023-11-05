@@ -62,22 +62,23 @@ jobs:
           ERROR_MESSAGE=""
           if [ ! -d "entregas" ]; then
             ERROR_MESSAGE+="entregas folder is missing.\n"
-          fi
-          # Look for camelCase folders inside the entregas folder,
-          # considering a folder name starting with lowercase, ending with lowercase, and exactly one uppercase in between
-          camel_case_folders=$(find entregas -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex "./entregas/[a-z]+[A-Z][a-z]+")
-          if [ -z "$camel_case_folders" ]; then
-            ERROR_MESSAGE+="No folder with student name found in entregas.\n"
           else
-            for folder in $camel_case_folders
-            do
-              if [ ! -d "$folder/reto-002" ]; then
-                ERROR_MESSAGE+="reto-002 folder is missing inside $folder.\n"
-              fi
-              if [ ! -e "$folder/reto-002/README.md" ]; then
-                ERROR_MESSAGE+="README.md file is missing inside $folder/reto-002.\n"
-              fi
-            done
+            cd entregas
+            camel_case_folders=$(find . -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex "./[a-z]+([A-Z][a-z]+)+")
+            cd ..
+            if [ -z "$camel_case_folders" ]; then
+              ERROR_MESSAGE+="No folder with student name found in entregas.\n"
+            else
+              for folder in $camel_case_folders
+              do
+                if [ ! -d "$folder/reto-002" ]; then
+                  ERROR_MESSAGE+="reto-002 folder is missing inside $folder.\n"
+                fi
+                if [ ! -e "$folder/reto-002/README.md" ]; then
+                  ERROR_MESSAGE+="README.md file is missing inside $folder/reto-002.\n"
+                fi
+              done
+            fi
           fi
           echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
 
@@ -115,3 +116,16 @@ jobs:
               -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
               -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"Hexcss\", \"repo\":\"personal-grade-checking-automation\"}"
           fi
+
+  prevent-merge-if-errors:
+    needs: check-structure
+    runs-on: ubuntu-latest
+    if: >-
+      needs.check-structure.outputs.pr-title-and-body != '' ||
+      needs.check-structure.outputs.ide-specific-files != '' ||
+      needs.check-structure.outputs.folder-structure != ''
+    steps:
+      - name: Block merge
+        run: |
+          echo "Errors were found during the structure checks. Merge is blocked."
+          exit 1

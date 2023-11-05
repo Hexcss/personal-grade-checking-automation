@@ -103,9 +103,11 @@ jobs:
           env.FOLDER_STRUCTURE != ''
         run: |
           errorMessages=()
+          labelsArray=()
           [[ -n "$PR_TITLE_AND_BODY" ]] && errorMessages+=("PR Title and Body: $PR_TITLE_AND_BODY")
           [[ -n "$IDE_SPECIFIC_FILES" ]] && errorMessages+=("IDE-specific files: $IDE_SPECIFIC_FILES")
           [[ -n "$FOLDER_STRUCTURE" ]] && errorMessages+=("Folder Structure: $FOLDER_STRUCTURE")
+          labelsArray+=("Error de estructura")
 
           if [ ${#errorMessages[@]} -gt 0 ]; then
             issueTitle="Error in PR #$PR_NUMBER"
@@ -114,7 +116,7 @@ jobs:
             curl -X POST "$API_ENDPOINT"\
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
-              -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"Hexcss\", \"repo\":\"personal-grade-checking-automation\"}"
+              -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"Hexcss\", \"repo\":\"personal-grade-checking-automation\", \"labels\":${labelsArray[@]}}"
           fi
 
   prevent-merge-if-errors:

@@ -24,7 +24,7 @@ jobs:
       # Security check
     - name: Check repository
       run: |
-        if [[ "$GITHUB_REPOSITORY" != "Hexcss/grade-checking-automation" ]]; then
+        if [[ "$GITHUB_REPOSITORY" != "Hexcss/personal-grade-checking-automation" ]]; then
           echo "This workflow only runs on the original repository."
           exit 1
         fi

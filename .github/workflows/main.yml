@@ -91,6 +91,7 @@ jobs:
       IDE_SPECIFIC_FILES: ${{ needs.check-structure.outputs.ide-specific-files }}
       FOLDER_STRUCTURE: ${{ needs.check-structure.outputs.folder-structure }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_AUTHOR: ${{ github.event.pull_request.user.login }}
       API_ENDPOINT: https://shfs5frz-9000.use.devtunnels.ms/create-issue
     steps:
       - name: Checkout code
@@ -110,13 +111,15 @@ jobs:
           labelsArray+=("Error de estructura")
 
           if [ ${#errorMessages[@]} -gt 0 ]; then
-            issueTitle="Error in PR #$PR_NUMBER"
+            issueTitle="Error in PR #$PR_NUMBER by @${PR_AUTHOR}"
             issueBody="The following errors were found in PR #$PR_NUMBER:\n${errorMessages[*]}"
+
+            labelsJson=$(printf '%s\n' "${labelsArray[@]}" | jq -R . | jq -s .)
 
             curl -X POST "$API_ENDPOINT"\
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
-              -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"Hexcss\", \"repo\":\"personal-grade-checking-automation\", \"labels\":${labelsArray[@]}}"
+              -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"Hexcss\", \"repo\":\"personal-grade-checking-automation\", \"labels\":$labelsJson}"
           fi
 
   prevent-merge-if-errors:

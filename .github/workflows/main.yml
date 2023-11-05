@@ -24,7 +24,7 @@ jobs:
       # Security check
     - name: Check repository
       run: |
-        if [[ "$GITHUB_REPOSITORY" != "Hexcss/personal-grade-checking-automation" ]]; then
+        if [[ "$GITHUB_REPOSITORY" != "Hexcss/grade-checking-automation" ]]; then
           echo "This workflow only runs on the original repository."
           exit 1
         fi
@@ -46,7 +46,7 @@ jobs:
         if [ -z "${{ github.event.pull_request.title }}" ] || [ -z "${{ github.event.pull_request.body }}" ]; then
           ERROR_MESSAGE+="PR title or body is empty.\n"
         fi
-        echo "error_message=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
+        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
 
     - name: Check for IDE-specific config files
       id: ide-specific-files
@@ -59,7 +59,7 @@ jobs:
             ERROR_MESSAGE+="IDE-specific config file $file found.\n"
           fi
         done
-        echo "error_message=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
+        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
 
     - name: Check folder structure
       id: folder-structure
@@ -81,29 +81,30 @@ jobs:
             ERROR_MESSAGE+="README.md file is missing inside $folder/reto-002.\n"
           fi
         done
-        echo "error_message=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
+        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> $GITHUB_OUTPUT
 
 
   notify-issue:
     needs: check-structure
     runs-on: ubuntu-latest
-    if: >-
-      always() &&
-      (
-        needs.check-structure.outputs.pr-title-and-body != '' ||
-        needs.check-structure.outputs.ide-specific-files != '' ||
-        needs.check-structure.outputs.folder-structure != ''
-      )
     steps:
       - name: Create an issue in the repository if there are errors
         uses: actions/github-script@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE_AND_BODY: ${{ needs.check-structure.outputs.pr-title-and-body }}
+          IDE_SPECIFIC_FILES: ${{ needs.check-structure.outputs.ide-specific-files }}
+          FOLDER_STRUCTURE: ${{ needs.check-structure.outputs.folder-structure }}
         with:
           script: |
+            if (process.env.PR_TITLE_AND_BODY.length === 0 && process.env.IDE_SPECIFIC_FILES.length === 0 && process.env.FOLDER_STRUCTURE.length === 0) {
+              return;
+            }
             const { owner, repo } = context.repo;
             const errorMessages = [
-              needs.check-structure.outputs.pr-title-and-body ? `PR Title and Body: ${process.env.PR_TITLE_AND_BODY}` : '',
-              needs.check-structure.outputs.ide-specific-files ? `IDE-specific files: ${process.env.IDE_SPECIFIC_FILES}` : '',
-              needs.check-structure.outputs.folder-structure ? `Folder Structure: ${process.env.FOLDER_STRUCTURE}` : ''
+              `PR Title and Body: ${process.env.PR_TITLE_AND_BODY}`,
+              `IDE-specific files: ${process.env.IDE_SPECIFIC_FILES}`,
+              `Folder Structure: ${process.env.FOLDER_STRUCTURE}`
             ].filter(Boolean).join('\n');
             
             if (errorMessages.length > 0) {
@@ -116,9 +117,4 @@ jobs:
                 body: issueBody
               });
             }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_TITLE_AND_BODY: ${{ needs.check-structure.outputs.pr-title-and-body }}
-          IDE_SPECIFIC_FILES: ${{ needs.check-structure.outputs.ide-specific-files }}
-          FOLDER_STRUCTURE: ${{ needs.check-structure.outputs.folder-structure }}
         

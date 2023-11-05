@@ -43,17 +43,18 @@ jobs:
       id: ide-specific-files
       run: |
         ERROR_MESSAGE=""
-        banned_files=("*.idea" "*.vscode" "*.eclipse")
+        banned_files=(".idea" ".vscode" ".eclipse")
         for pattern in "${banned_files[@]}"
         do
-          # Using the globstar shell option to match files recursively
-          shopt -s globstar
-          files=$(echo $pattern)
+          # Find files matching the pattern
+          files=$(find . -name "$pattern" -print)
           if [ ! -z "$files" ]; then
             ERROR_MESSAGE+="IDE-specific config files found: $files.\n"
           fi
         done
-        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
+        if [ ! -z "$ERROR_MESSAGE" ]; then
+          echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Check folder structure
       id: folder-structure
@@ -62,10 +63,10 @@ jobs:
         if [ ! -d "entregas" ]; then
           ERROR_MESSAGE+="entregas folder is missing.\n"
         fi
-        # Corrected regex for camel case folders
-        camel_case_folders=$(find . -maxdepth 1 -type d -regex "./[a-z]+([A-Z][a-z]+)+")
+        # Look for camelCase folders inside the entregas folder
+        camel_case_folders=$(find entregas -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex "./entregas/[a-z]+[A-Z][a-zA-Z]*")
         if [ -z "$camel_case_folders" ]; then
-          ERROR_MESSAGE+="No folder with student name found.\n"
+          ERROR_MESSAGE+="No folder with student name found in entregas.\n"
         else
           for folder in $camel_case_folders
           do

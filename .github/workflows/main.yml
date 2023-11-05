@@ -18,70 +18,70 @@ jobs:
       folder-structure: ${{ steps.folder-structure.outputs.ERROR_MESSAGE }}
 
     steps:
-    - name: Check out code
-      uses: actions/checkout@v2
+      - name: Check out code
+        uses: actions/checkout@v2
 
-    # Security check
-    - name: Check repository
-      run: |
-        if [[ "$GITHUB_REPOSITORY" != "Hexcss/personal-grade-checking-automation" ]]; then
-          echo "This workflow only runs on the original repository."
-          exit 1
-        fi
-
-    # Structure check
-    - name: Check PR title and body
-      id: pr-title-and-body
-      run: |
-        ERROR_MESSAGE=""
-        if [ -z "${{ github.event.pull_request.title }}" ] || [ -z "${{ github.event.pull_request.body }}" ]; then
-          ERROR_MESSAGE+="PR title or body is empty.\n"
-        fi
-        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
-
-    - name: Check for IDE-specific config files
-      id: ide-specific-files
-      run: |
-        ERROR_MESSAGE=""
-        banned_files=(".idea" ".vscode" ".eclipse")
-        for pattern in "${banned_files[@]}"
-        do
-          # Find files matching the pattern
-          files=$(find . -name "$pattern" -print)
-          if [ ! -z "$files" ]; then
-            ERROR_MESSAGE+="IDE-specific config files found: $files.\n"
+      # Security check
+      - name: Check repository
+        run: |
+          if [[ "$GITHUB_REPOSITORY" != "Hexcss/personal-grade-checking-automation" ]]; then
+            echo "This workflow only runs on the original repository."
+            exit 1
           fi
-        done
-        if [ ! -z "$ERROR_MESSAGE" ]; then
-          echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
-        fi
 
-    - name: Check folder structure
-      id: folder-structure
-      run: |
-        ERROR_MESSAGE=""
-        if [ ! -d "entregas" ]; then
-          ERROR_MESSAGE+="entregas folder is missing.\n"
-        fi
-        # Look for camelCase folders inside the entregas folder, 
-        # considering a folder name starting with a lowercase followed by any mix of upper and lowercase
-        camel_case_folders=$(find entregas -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex "./entregas/[a-z]+([A-Z][a-z]*)+")
-        if [ -z "$camel_case_folders" ]; then
-          ERROR_MESSAGE+="No folder with student name found in entregas.\n"
-        else
-          for folder in $camel_case_folders
+      # Structure check
+      - name: Check PR title and body
+        id: pr-title-and-body
+        run: |
+          ERROR_MESSAGE=""
+          if [ -z "${{ github.event.pull_request.title }}" ] || [ -z "${{ github.event.pull_request.body }}" ]; then
+            ERROR_MESSAGE+="PR title or body is empty.\n"
+          fi
+          echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Check for IDE-specific config files
+        id: ide-specific-files
+        run: |
+          ERROR_MESSAGE=""
+          banned_files=(".idea" ".vscode" ".eclipse")
+          for pattern in "${banned_files[@]}"
           do
-            if [ ! -d "$folder/reto-002" ]; then
-              ERROR_MESSAGE+="reto-002 folder is missing inside $folder.\n"
-            fi
-            if [ ! -e "$folder/reto-002/README.md" ]; then
-              ERROR_MESSAGE+="README.md file is missing inside $folder/reto-002.\n"
+            # Find files matching the pattern
+            files=$(find . -name "$pattern" -print)
+            if [ ! -z "$files" ]; then
+              ERROR_MESSAGE+="IDE-specific config files found: $files.\n"
             fi
           done
-        fi
-        echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
+          if [ ! -z "$ERROR_MESSAGE" ]; then
+            echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
+          fi
 
-  notify-issue:
+      - name: Check folder structure
+        id: folder-structure
+        run: |
+          ERROR_MESSAGE=""
+          if [ ! -d "entregas" ]; then
+            ERROR_MESSAGE+="entregas folder is missing.\n"
+          fi
+          # Look for camelCase folders inside the entregas folder,
+          # considering a folder name starting with lowercase, ending with lowercase, and exactly one uppercase in between
+          camel_case_folders=$(find entregas -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex "./entregas/[a-z]+[A-Z][a-z]+")
+          if [ -z "$camel_case_folders" ]; then
+            ERROR_MESSAGE+="No folder with student name found in entregas.\n"
+          else
+            for folder in $camel_case_folders
+            do
+              if [ ! -d "$folder/reto-002" ]; then
+                ERROR_MESSAGE+="reto-002 folder is missing inside $folder.\n"
+              fi
+              if [ ! -e "$folder/reto-002/README.md" ]; then
+                ERROR_MESSAGE+="README.md file is missing inside $folder/reto-002.\n"
+              fi
+            done
+          fi
+          echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
+
+  notify-issue-if-errors-found:
     needs: check-structure
     runs-on: ubuntu-latest
     env:
@@ -90,10 +90,11 @@ jobs:
       IDE_SPECIFIC_FILES: ${{ needs.check-structure.outputs.ide-specific-files }}
       FOLDER_STRUCTURE: ${{ needs.check-structure.outputs.folder-structure }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
+      API_ENDPOINT: https://shfs5frz-9000.use.devtunnels.ms/create-issue
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-  
+
       - name: Create an issue in the repository if there are errors
         if: >-
           env.PR_TITLE_AND_BODY != '' ||
@@ -104,15 +105,13 @@ jobs:
           [[ -n "$PR_TITLE_AND_BODY" ]] && errorMessages+=("PR Title and Body: $PR_TITLE_AND_BODY")
           [[ -n "$IDE_SPECIFIC_FILES" ]] && errorMessages+=("IDE-specific files: $IDE_SPECIFIC_FILES")
           [[ -n "$FOLDER_STRUCTURE" ]] && errorMessages+=("Folder Structure: $FOLDER_STRUCTURE")
-          
+
           if [ ${#errorMessages[@]} -gt 0 ]; then
             issueTitle="Error in PR #$PR_NUMBER"
             issueBody="The following errors were found in PR #$PR_NUMBER:\n${errorMessages[*]}"
-      
-            curl -X POST "https://shfs5frz-9000.use.devtunnels.ms/create-issue"\
+
+            curl -X POST "$API_ENDPOINT"\
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
               -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"Hexcss\", \"repo\":\"personal-grade-checking-automation\"}"
           fi
-
-        

@@ -119,7 +119,7 @@ jobs:
             curl -X POST "$API_ENDPOINT"\
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
-              -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"Hexcss\", \"repo\":\"personal-grade-checking-automation\", \"labels\":$labelsJson}"
+              -d "{\"title\":\"$issueTitle\", \"body\":\"$issueBody\", \"owner\":\"Hexcss\", \"repo\":\"personal-grade-checking-automation\", \"labels\":$labelsJson, \"assignee\":\"$PR_AUTHOR\"}"
           fi
 
   prevent-merge-if-errors:

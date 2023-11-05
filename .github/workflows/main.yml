@@ -63,8 +63,9 @@ jobs:
         if [ ! -d "entregas" ]; then
           ERROR_MESSAGE+="entregas folder is missing.\n"
         fi
-        # Look for camelCase folders inside the entregas folder
-        camel_case_folders=$(find entregas -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex "./entregas/[a-z]+[A-Z][a-zA-Z]*")
+        # Look for camelCase folders inside the entregas folder, 
+        # considering a folder name starting with a lowercase followed by any mix of upper and lowercase
+        camel_case_folders=$(find entregas -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex "./entregas/[a-z]+([A-Z][a-z]*)+")
         if [ -z "$camel_case_folders" ]; then
           ERROR_MESSAGE+="No folder with student name found in entregas.\n"
         else
@@ -79,7 +80,6 @@ jobs:
           done
         fi
         echo "ERROR_MESSAGE=$ERROR_MESSAGE" >> "$GITHUB_OUTPUT"
-
 
   notify-issue:
     needs: check-structure

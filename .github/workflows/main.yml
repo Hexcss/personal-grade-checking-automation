@@ -112,7 +112,7 @@ jobs:
 
           if [ ${#errorMessages[@]} -gt 0 ]; then
             issueTitle="Error in PR #$PR_NUMBER by @${PR_AUTHOR}"
-            issueBody="The following errors were found in PR #$PR_NUMBER:\n${errorMessages[*]}"
+            issueBody="${errorMessages[*]}"
 
             labelsJson=$(printf '%s\n' "${labelsArray[@]}" | jq -R . | jq -s .)
 

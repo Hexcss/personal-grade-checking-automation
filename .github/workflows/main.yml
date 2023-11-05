@@ -87,34 +87,36 @@ jobs:
   notify-issue:
     needs: check-structure
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_TITLE_AND_BODY: ${{ needs.check-structure.outputs.pr-title-and-body }}
+      IDE_SPECIFIC_FILES: ${{ needs.check-structure.outputs.ide-specific-files }}
+      FOLDER_STRUCTURE: ${{ needs.check-structure.outputs.folder-structure }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+  
+      - name: Install GitHub CLI
+        run: |
+          sudo apt update
+          sudo apt install -y gh
+  
       - name: Create an issue in the repository if there are errors
-        uses: actions/github-script@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_TITLE_AND_BODY: ${{ needs.check-structure.outputs.pr-title-and-body }}
-          IDE_SPECIFIC_FILES: ${{ needs.check-structure.outputs.ide-specific-files }}
-          FOLDER_STRUCTURE: ${{ needs.check-structure.outputs.folder-structure }}
-        with:
-          script: |
-            if (process.env.PR_TITLE_AND_BODY.length === 0 && process.env.IDE_SPECIFIC_FILES.length === 0 && process.env.FOLDER_STRUCTURE.length === 0) {
-              return;
-            }
-            const { owner, repo } = context.repo;
-            const errorMessages = [
-              `PR Title and Body: ${process.env.PR_TITLE_AND_BODY}`,
-              `IDE-specific files: ${process.env.IDE_SPECIFIC_FILES}`,
-              `Folder Structure: ${process.env.FOLDER_STRUCTURE}`
-            ].filter(Boolean).join('\n');
-            
-            if (errorMessages.length > 0) {
-              const issueTitle = `Error in PR #${{ github.event.pull_request.number }}`;
-              const issueBody = `The following errors were found in PR #${{ github.event.pull_request.number }}:\n${errorMessages}`;
-              await github.issues.create({
-                owner: owner,
-                repo: repo,
-                title: issueTitle,
-                body: issueBody
-              });
-            }
+        if: >-
+          env.PR_TITLE_AND_BODY != '' ||
+          env.IDE_SPECIFIC_FILES != '' ||
+          env.FOLDER_STRUCTURE != ''
+        run: |
+          errorMessages=()
+          [[ -n "$PR_TITLE_AND_BODY" ]] && errorMessages+=("PR Title and Body: $PR_TITLE_AND_BODY")
+          [[ -n "$IDE_SPECIFIC_FILES" ]] && errorMessages+=("IDE-specific files: $IDE_SPECIFIC_FILES")
+          [[ -n "$FOLDER_STRUCTURE" ]] && errorMessages+=("Folder Structure: $FOLDER_STRUCTURE")
+          
+          if [ ${#errorMessages[@]} -gt 0 ]; then
+            issueTitle="Error in PR #$PR_NUMBER"
+            issueBody="The following errors were found in PR #$PR_NUMBER:\n${errorMessages[*]}"
+            echo "$issueBody" | gh issue create --title "$issueTitle" --body -
+          fi
+
         
